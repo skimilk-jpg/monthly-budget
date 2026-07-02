@@ -4,17 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Budget Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='12.5' cy='33' rx='7.5' ry='13.5' fill='%23cd8f3c'/%3E%3Cellipse cx='51.5' cy='33' rx='7.5' ry='13.5' fill='%23cd8f3c'/%3E%3Ccircle cx='32' cy='31' r='19' fill='%23eab659'/%3E%3Cellipse cx='32' cy='39' rx='10.5' ry='7.6' fill='%23f9ebcd'/%3E%3Ccircle cx='25' cy='27' r='2.4' fill='%23443019'/%3E%3Ccircle cx='39' cy='27' r='2.4' fill='%23443019'/%3E%3Cellipse cx='32' cy='35.5' rx='3.5' ry='2.6' fill='%23443019'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    --bg:#f4f6fa; --card:#ffffff; --ink:#1c2333; --muted:#6b7487;
-    --accent:#3556e0; --accent-soft:#e8edfd; --green:#0f9d58; --green-soft:#e6f5ec;
-    --red:#d93838; --red-soft:#fdecec; --amber:#b7791f; --amber-soft:#fdf3e0;
-    --border:#e3e7ef; --radius:14px;
+    /* golden-retriever palette: honey, cream, warm brown */
+    --bg:#faf5ea; --card:#fffdf8; --ink:#42351f; --muted:#99886a;
+    --accent:#c9861d; --accent-soft:#f7ecd6; --green:#3f9960; --green-soft:#e6f3ea;
+    --red:#d45744; --red-soft:#fbeae6; --amber:#41898a; --amber-soft:#e2f0ef;
+    --border:#ecdfc6; --radius:14px;
     font-size:15px;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh;}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cg fill='%23c9861d' fill-opacity='0.045'%3E%3Cellipse cx='30' cy='34' rx='9' ry='7.5'/%3E%3Cellipse cx='17' cy='22' rx='3.8' ry='5'/%3E%3Cellipse cx='26' cy='16' rx='3.8' ry='5'/%3E%3Cellipse cx='36' cy='17' rx='3.8' ry='5'/%3E%3Cellipse cx='43' cy='24' rx='3.8' ry='5'/%3E%3Cellipse cx='86' cy='92' rx='9' ry='7.5'/%3E%3Cellipse cx='73' cy='80' rx='3.8' ry='5'/%3E%3Cellipse cx='82' cy='74' rx='3.8' ry='5'/%3E%3Cellipse cx='92' cy='75' rx='3.8' ry='5'/%3E%3Cellipse cx='99' cy='82' rx='3.8' ry='5'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:130px;}
   h1,h2,h3{font-weight:650;}
   button{font-family:inherit; cursor:pointer;}
   input,select{font-family:inherit; font-size:0.95rem; padding:9px 11px; border:1px solid var(--border); border-radius:9px; background:#fff; color:var(--ink); width:100%;}
@@ -22,7 +26,7 @@
   label{display:block; font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
 
   /* ---------- Lock screen ---------- */
-  #lockScreen{position:fixed; inset:0; background:linear-gradient(135deg,#1b2340 0%,#2c3e8f 100%); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;}
+  #lockScreen{position:fixed; inset:0; background:linear-gradient(135deg,#5e3d0c 0%,#cf9235 100%); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;}
   .lock-card{background:#fff; border-radius:18px; padding:38px 34px; width:100%; max-width:420px; box-shadow:0 24px 70px rgba(0,0,0,.4);}
   .lock-card h1{font-size:1.35rem; margin-bottom:6px;}
   .lock-card p{color:var(--muted); font-size:0.9rem; margin-bottom:20px; line-height:1.5;}
@@ -34,7 +38,12 @@
   .btn.ghost{background:transparent; color:var(--accent); border:1px solid var(--border);}
   .btn.danger{background:var(--red);}
   .btn.small{padding:6px 12px; font-size:0.82rem; border-radius:7px;}
-  .lock-icon{width:52px; height:52px; border-radius:14px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:16px;}
+  .lock-icon{width:64px; height:64px; border-radius:18px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; padding:7px; margin-bottom:16px;}
+  .dog-slot svg{display:block; width:100%; height:auto;}
+  .card{position:relative;}
+  .peek{position:absolute; top:-25px; right:28px; width:50px; pointer-events:none; transform:rotate(3deg);}
+  .peek.left{right:auto; left:28px; transform:rotate(-4deg);}
+  .paw-row{text-align:center; margin-top:16px; opacity:.4; letter-spacing:10px; font-size:.9rem; user-select:none;}
 
   /* ---------- App shell ---------- */
   #app{display:none; max-width:1240px; margin:0 auto; padding:22px 22px 60px;}
@@ -66,14 +75,14 @@
 
   /* Tables */
   .tbl-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px;}
-  table{border-collapse:collapse; width:100%; font-size:0.88rem; background:#fff;}
+  table{border-collapse:collapse; width:100%; font-size:0.88rem; background:var(--card);}
   th,td{padding:9px 12px; text-align:right; border-bottom:1px solid var(--border); white-space:nowrap;}
-  th{background:#f8f9fc; font-size:0.75rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); position:sticky; top:0;}
-  th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:#fff; z-index:2; box-shadow:1px 0 0 var(--border); max-width:220px; overflow:hidden; text-overflow:ellipsis;}
-  th:first-child{background:#f8f9fc; z-index:3;}
+  th{background:#f7f0de; font-size:0.75rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); position:sticky; top:0;}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:var(--card); z-index:2; box-shadow:1px 0 0 var(--border); max-width:220px; overflow:hidden; text-overflow:ellipsis;}
+  th:first-child{background:#f7f0de; z-index:3;}
   tr:last-child td{border-bottom:none;}
-  tr.total-row td{font-weight:700; background:#f8f9fc;}
-  tr.total-row td:first-child{background:#f8f9fc;}
+  tr.total-row td{font-weight:700; background:#f7f0de;}
+  tr.total-row td:first-child{background:#f7f0de;}
   td input[type=number]{width:96px; padding:6px 8px; text-align:right; border-radius:7px;}
   td input[type=text]{padding:6px 8px; border-radius:7px;}
   .tag{display:inline-block; padding:2px 9px; border-radius:99px; font-size:0.72rem; font-weight:700;}
@@ -87,7 +96,7 @@
   .row-actions button{background:none; border:none; color:var(--muted); font-size:1rem; padding:2px 6px;}
   .row-actions button:hover{color:var(--red);}
   .muted{color:var(--muted); font-size:0.85rem; line-height:1.5;}
-  .disclaimer{font-size:0.78rem; color:var(--muted); background:#f8f9fc; border:1px dashed var(--border); border-radius:10px; padding:10px 14px; line-height:1.55; margin-top:14px;}
+  .disclaimer{font-size:0.78rem; color:var(--muted); background:#f7f1e1; border:1px dashed var(--border); border-radius:10px; padding:10px 14px; line-height:1.55; margin-top:14px;}
   .breakdown{display:grid; grid-template-columns:1fr auto; gap:6px 20px; font-size:0.92rem; max-width:460px;}
   .breakdown .b-lbl{color:var(--muted);}
   .breakdown .b-val{text-align:right; font-weight:600; font-variant-numeric:tabular-nums;}
@@ -106,23 +115,27 @@
 <!-- ================= LOCK SCREEN ================= -->
 <div id="lockScreen">
   <div class="lock-card">
-    <div class="lock-icon">🔒</div>
+    <div class="lock-icon dog-slot"></div>
     <h1 id="lockTitle">Monthly Budget</h1>
     <p id="lockMsg">Enter your password to unlock your budget. Your data is encrypted in this browser with AES-256 — the password never leaves your device.</p>
     <div class="field" id="pwField"><label>Password</label><input type="password" id="pwInput" autocomplete="current-password"></div>
     <div class="field" id="pwConfirmField" style="display:none"><label>Confirm password</label><input type="password" id="pwConfirm" autocomplete="new-password"></div>
     <div class="lock-err" id="lockErr"></div>
     <button class="btn full" id="unlockBtn">Unlock</button>
-    <p style="margin-top:16px; font-size:0.78rem;" id="resetHint"></p>
+    <div class="paw-row">🐾&nbsp;🐾&nbsp;🐾</div>
+    <p style="margin-top:10px; font-size:0.78rem;" id="resetHint"></p>
   </div>
 </div>
 
 <!-- ================= APP ================= -->
 <div id="app">
   <header class="top">
-    <div>
-      <h1 id="appTitle">Monthly Budget</h1>
-      <div class="sub">Actual spend vs. budget, funded by your net payroll</div>
+    <div style="display:flex; align-items:center; gap:12px">
+      <div class="dog-slot" style="width:46px; flex-shrink:0"></div>
+      <div>
+        <h1 id="appTitle">Monthly Budget</h1>
+        <div class="sub">Actual spend vs. budget, funded by your net payroll</div>
+      </div>
     </div>
     <div class="top-actions">
       <button class="btn ghost small" onclick="exportData()">⬇ Export</button>
@@ -144,7 +157,7 @@
   <section id="tab-dashboard">
     <div class="kpis" id="kpiRow"></div>
     <div class="charts-row">
-      <div class="card"><h2>Budget vs. Actual Spend by Month</h2><div class="chart-box"><canvas id="chartBva"></canvas></div></div>
+      <div class="card"><div class="peek dog-slot"></div><h2>Budget vs. Actual Spend by Month</h2><div class="chart-box"><canvas id="chartBva"></canvas></div></div>
       <div class="card">
         <div class="flex-between"><h2 style="margin-bottom:0">Spend by Category</h2><select id="doughnutMonth" style="width:auto" onchange="renderDoughnut()"></select></div>
         <div class="chart-box" style="margin-top:12px"><canvas id="chartCat"></canvas></div>
@@ -219,6 +232,7 @@
   <!-- ---------- BUDGET ---------- -->
   <section id="tab-budget" style="display:none">
     <div class="card">
+      <div class="peek left dog-slot"></div>
       <div class="flex-between" style="margin-bottom:14px">
         <h2 style="margin-bottom:0">Monthly Budget by Expense Item</h2>
         <div style="display:flex; gap:8px; align-items:center">
@@ -245,6 +259,21 @@
 
 <script>
 'use strict';
+/* ---------- Golden retriever mascot (injected into every .dog-slot) ---------- */
+const DOG_SVG = `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <ellipse cx="12.5" cy="33" rx="7.5" ry="13.5" fill="#cd8f3c"/>
+  <ellipse cx="51.5" cy="33" rx="7.5" ry="13.5" fill="#cd8f3c"/>
+  <circle cx="32" cy="31" r="19" fill="#eab659"/>
+  <ellipse cx="32" cy="39" rx="10.5" ry="7.6" fill="#f9ebcd"/>
+  <ellipse cx="20.5" cy="34" rx="3" ry="1.8" fill="#f0a98f" opacity=".5"/>
+  <ellipse cx="43.5" cy="34" rx="3" ry="1.8" fill="#f0a98f" opacity=".5"/>
+  <circle cx="25" cy="27" r="2.4" fill="#443019"/>
+  <circle cx="39" cy="27" r="2.4" fill="#443019"/>
+  <ellipse cx="32" cy="35.5" rx="3.5" ry="2.6" fill="#443019"/>
+  <path d="M32 38 q0 3.4 -3.4 4.4 M32 38 q0 3.4 3.4 4.4" stroke="#443019" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+</svg>`;
+document.querySelectorAll('.dog-slot').forEach(el=>{ el.innerHTML = DOG_SVG; });
+
 /* =====================================================================
    TAX DATA — estimates, single filer, 2025/26 rules. Amounts in local
    currency of the country. Brackets are [threshold, marginalRate] on
@@ -606,7 +635,7 @@ function netMonthlyIncome(){ return calcPayroll(state.settings).net/12 + (+state
 
 let toastTimer;
 function toast(msg){
-  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  const t=$('toast'); t.textContent='🐾 '+msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 const debouncedSave = (()=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(saveState,400); }; })();
@@ -891,9 +920,9 @@ function renderDoughnut(){
   const mKey = $('doughnutMonth').value;
   const has = monthHasData(mKey);
   const items = state.expenses.map(e=>({name:e.name, v: has ? (+actual(mKey,e.id)||0) : (+e.budget||0)})).filter(x=>x.v>0);
-  const palette = ['#3556e0','#0f9d58','#b7791f','#d93838','#7c3aed','#0891b2','#db2777','#65a30d','#dc7633','#5d6d7e','#16a085','#8e44ad'];
+  const palette = ['#c9861d','#41898a','#c9704f','#7ba05b','#a3719e','#5b8bb5','#e0b04b','#8c6d46','#d99a94','#6b705c','#b5838d','#468189'];
   mkChart('chartCat', {type:'doughnut',
-    data:{labels:items.map(x=>x.name), datasets:[{data:items.map(x=>x.v), backgroundColor:items.map((_,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fff'}]},
+    data:{labels:items.map(x=>x.name), datasets:[{data:items.map(x=>x.v), backgroundColor:items.map((_,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fffdf8'}]},
     options:{responsive:true, maintainAspectRatio:false, cutout:'58%',
       plugins:{legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}},
         tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+(has?'':' (budget)')}},
