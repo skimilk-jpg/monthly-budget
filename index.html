@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Budget Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#ffffff; --ink:#1c2333; --muted:#6b7487;
+    --accent:#3556e0; --accent-soft:#e8edfd; --green:#0f9d58; --green-soft:#e6f5ec;
+    --red:#d93838; --red-soft:#fdecec; --amber:#b7791f; --amber-soft:#fdf3e0;
+    --border:#e3e7ef; --radius:14px;
+    font-size:15px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--ink); min-height:100vh;}
+  h1,h2,h3{font-weight:650;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select{font-family:inherit; font-size:0.95rem; padding:9px 11px; border:1px solid var(--border); border-radius:9px; background:#fff; color:var(--ink); width:100%;}
+  input:focus,select:focus{outline:2px solid var(--accent-soft); border-color:var(--accent);}
+  label{display:block; font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+
+  /* ---------- Lock screen ---------- */
+  #lockScreen{position:fixed; inset:0; background:linear-gradient(135deg,#1b2340 0%,#2c3e8f 100%); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;}
+  .lock-card{background:#fff; border-radius:18px; padding:38px 34px; width:100%; max-width:420px; box-shadow:0 24px 70px rgba(0,0,0,.4);}
+  .lock-card h1{font-size:1.35rem; margin-bottom:6px;}
+  .lock-card p{color:var(--muted); font-size:0.9rem; margin-bottom:20px; line-height:1.5;}
+  .lock-card .field{margin-bottom:14px;}
+  .lock-err{color:var(--red); font-size:0.85rem; margin:-4px 0 12px; display:none;}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:7px; background:var(--accent); color:#fff; border:none; border-radius:9px; padding:10px 18px; font-size:0.95rem; font-weight:600; transition:filter .15s;}
+  .btn:hover{filter:brightness(1.1);}
+  .btn.full{width:100%;}
+  .btn.ghost{background:transparent; color:var(--accent); border:1px solid var(--border);}
+  .btn.danger{background:var(--red);}
+  .btn.small{padding:6px 12px; font-size:0.82rem; border-radius:7px;}
+  .lock-icon{width:52px; height:52px; border-radius:14px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:16px;}
+
+  /* ---------- App shell ---------- */
+  #app{display:none; max-width:1240px; margin:0 auto; padding:22px 22px 60px;}
+  header.top{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:20px; flex-wrap:wrap;}
+  header.top h1{font-size:1.3rem;}
+  header.top .sub{color:var(--muted); font-size:0.85rem;}
+  .top-actions{display:flex; gap:8px; flex-wrap:wrap;}
+
+  nav.tabs{display:flex; gap:6px; margin-bottom:22px; flex-wrap:wrap; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:6px;}
+  nav.tabs button{flex:1; min-width:120px; background:transparent; border:none; border-radius:8px; padding:10px 14px; font-size:0.92rem; font-weight:600; color:var(--muted);}
+  nav.tabs button.active{background:var(--accent); color:#fff;}
+  nav.tabs button:not(.active):hover{background:var(--accent-soft); color:var(--accent);}
+
+  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:18px;}
+  .card h2{font-size:1.02rem; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+  .card h2 .hint{font-size:0.78rem; font-weight:500; color:var(--muted);}
+  .grid{display:grid; gap:14px;}
+  .grid.cols-2{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+  .grid.cols-3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+  .grid.cols-4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+
+  /* KPI tiles */
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:18px;}
+  .kpi{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px;}
+  .kpi .lbl{font-size:0.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;}
+  .kpi .val{font-size:1.45rem; font-weight:700;}
+  .kpi .delta{font-size:0.8rem; margin-top:4px; font-weight:600;}
+  .pos{color:var(--green);} .neg{color:var(--red);} .neutral{color:var(--muted);}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px;}
+  table{border-collapse:collapse; width:100%; font-size:0.88rem; background:#fff;}
+  th,td{padding:9px 12px; text-align:right; border-bottom:1px solid var(--border); white-space:nowrap;}
+  th{background:#f8f9fc; font-size:0.75rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); position:sticky; top:0;}
+  th:first-child,td:first-child{text-align:left; position:sticky; left:0; background:#fff; z-index:2; box-shadow:1px 0 0 var(--border); max-width:220px; overflow:hidden; text-overflow:ellipsis;}
+  th:first-child{background:#f8f9fc; z-index:3;}
+  tr:last-child td{border-bottom:none;}
+  tr.total-row td{font-weight:700; background:#f8f9fc;}
+  tr.total-row td:first-child{background:#f8f9fc;}
+  td input[type=number]{width:96px; padding:6px 8px; text-align:right; border-radius:7px;}
+  td input[type=text]{padding:6px 8px; border-radius:7px;}
+  .tag{display:inline-block; padding:2px 9px; border-radius:99px; font-size:0.72rem; font-weight:700;}
+  .tag.mand{background:var(--accent-soft); color:var(--accent);}
+  .tag.disc{background:var(--amber-soft); color:var(--amber);}
+
+  .charts-row{display:grid; grid-template-columns:2fr 1fr; gap:18px;}
+  @media(max-width:900px){.charts-row{grid-template-columns:1fr;}}
+  .chart-box{position:relative; height:320px;}
+
+  .row-actions button{background:none; border:none; color:var(--muted); font-size:1rem; padding:2px 6px;}
+  .row-actions button:hover{color:var(--red);}
+  .muted{color:var(--muted); font-size:0.85rem; line-height:1.5;}
+  .disclaimer{font-size:0.78rem; color:var(--muted); background:#f8f9fc; border:1px dashed var(--border); border-radius:10px; padding:10px 14px; line-height:1.55; margin-top:14px;}
+  .breakdown{display:grid; grid-template-columns:1fr auto; gap:6px 20px; font-size:0.92rem; max-width:460px;}
+  .breakdown .b-lbl{color:var(--muted);}
+  .breakdown .b-val{text-align:right; font-weight:600; font-variant-numeric:tabular-nums;}
+  .breakdown .b-net{font-size:1.05rem; font-weight:800; border-top:2px solid var(--ink); padding-top:8px;}
+  .breakdown .b-sub{border-top:1px solid var(--border); padding-top:6px;}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 20px; border-radius:99px; font-size:0.88rem; opacity:0; transition:opacity .3s; pointer-events:none; z-index:2000;}
+  .toast.show{opacity:1;}
+  .flex-between{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+  .paycheck-band{display:flex; gap:14px; flex-wrap:wrap; margin-top:16px;}
+  .pc-chip{background:var(--green-soft); color:var(--green); border-radius:10px; padding:10px 16px; font-weight:700;}
+  .pc-chip span{display:block; font-size:0.72rem; font-weight:600; opacity:.8; text-transform:uppercase;}
+</style>
+</head>
+<body>
+
+<!-- ================= LOCK SCREEN ================= -->
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h1 id="lockTitle">Monthly Budget</h1>
+    <p id="lockMsg">Enter your password to unlock your budget. Your data is encrypted in this browser with AES-256 — the password never leaves your device.</p>
+    <div class="field" id="pwField"><label>Password</label><input type="password" id="pwInput" autocomplete="current-password"></div>
+    <div class="field" id="pwConfirmField" style="display:none"><label>Confirm password</label><input type="password" id="pwConfirm" autocomplete="new-password"></div>
+    <div class="lock-err" id="lockErr"></div>
+    <button class="btn full" id="unlockBtn">Unlock</button>
+    <p style="margin-top:16px; font-size:0.78rem;" id="resetHint"></p>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <header class="top">
+    <div>
+      <h1 id="appTitle">Monthly Budget</h1>
+      <div class="sub">Actual spend vs. budget, funded by your net payroll</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost small" onclick="exportData()">⬇ Export</button>
+      <button class="btn ghost small" onclick="document.getElementById('importFile').click()">⬆ Import</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn ghost small" onclick="openChangePw()">Change password</button>
+      <button class="btn small" onclick="lockApp()">🔒 Lock</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button data-tab="income" onclick="switchTab('income')">💼 Income & Taxes</button>
+    <button data-tab="budget" onclick="switchTab('budget')">📝 Budget</button>
+    <button data-tab="tracking" onclick="switchTab('tracking')">📅 Monthly Tracking</button>
+  </nav>
+
+  <!-- ---------- DASHBOARD ---------- -->
+  <section id="tab-dashboard">
+    <div class="kpis" id="kpiRow"></div>
+    <div class="charts-row">
+      <div class="card"><h2>Budget vs. Actual Spend by Month</h2><div class="chart-box"><canvas id="chartBva"></canvas></div></div>
+      <div class="card">
+        <div class="flex-between"><h2 style="margin-bottom:0">Spend by Category</h2><select id="doughnutMonth" style="width:auto" onchange="renderDoughnut()"></select></div>
+        <div class="chart-box" style="margin-top:12px"><canvas id="chartCat"></canvas></div>
+      </div>
+    </div>
+    <div class="card"><h2>Remaining Cash for Savings <span class="hint">net income + other income − spend · lighter bars are forecast at budget</span></h2><div class="chart-box"><canvas id="chartSavings"></canvas></div></div>
+    <div class="card">
+      <h2>Cash Balance Carry-Forward <span class="hint">tracked months use actual spend; future months are forecast at budget</span></h2>
+      <div class="tbl-wrap"><table id="carryTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>Monthly Summary</h2>
+      <div class="tbl-wrap"><table id="summaryTable"></table></div>
+    </div>
+  </section>
+
+  <!-- ---------- INCOME & TAXES ---------- -->
+  <section id="tab-income" style="display:none">
+    <div class="card">
+      <h2>Salary & Jurisdiction <span class="hint">estimate net pay from taxes, or enter your real pay slip</span></h2>
+      <div class="grid cols-3">
+        <div><label>Income source</label><select id="inIncomeMode" onchange="onIncomeModeChange()">
+          <option value="estimate">Estimate net from salary & taxes</option>
+          <option value="payslip">Actual amounts from my pay slip</option></select></div>
+        <div><label>Currency</label><select id="inCurrency" onchange="onIncomeChange()"></select></div>
+        <div><label>Pay frequency</label><select id="inFreq" onchange="onIncomeChange()">
+          <option value="52">Weekly (52/yr)</option><option value="26">Bi-weekly (26/yr)</option>
+          <option value="24">Semi-monthly (24/yr)</option><option value="12">Monthly (12/yr)</option>
+          <option value="1">Annual (1/yr)</option></select></div>
+        <div id="salaryWrap"><label>Annual gross salary</label><input type="number" id="inSalary" min="0" step="500" onchange="onIncomeChange()"></div>
+        <div id="countryWrap"><label>Country</label><select id="inCountry" onchange="onCountryChange()"></select></div>
+        <div id="regionWrap"><label id="regionLbl">State / Province</label><select id="inRegion" onchange="onIncomeChange()"></select></div>
+        <div id="manualRateWrap" style="display:none"><label>Effective tax rate %</label><input type="number" id="inManualRate" min="0" max="60" step="0.5" onchange="onIncomeChange()"></div>
+        <div class="ps-field" style="display:none"><label>Gross pay per pay period</label><input type="number" id="inPsGross" min="0" step="50" onchange="onIncomeChange()"></div>
+        <div class="ps-field" style="display:none"><label>Net (take-home) per pay period</label><input type="number" id="inPsNet" min="0" step="50" onchange="onIncomeChange()"></div>
+        <div class="ps-field" style="display:none"><label>Income tax withheld (optional)</label><input type="number" id="inPsTax" min="0" step="10" onchange="onIncomeChange()"></div>
+        <div class="ps-field" style="display:none"><label>Other deductions (optional)</label><input type="number" id="inPsOther" min="0" step="10" onchange="onIncomeChange()"></div>
+        <div><label>Other monthly income (net)</label><input type="number" id="inOtherIncome" min="0" step="50" onchange="onIncomeChange()"></div>
+      </div>
+      <p class="muted ps-field" style="display:none; margin-top:10px">Copy the amounts straight from one pay slip. If you leave net pay empty it is calculated as gross − tax − other deductions; the tax and deduction fields are only used for the breakdown display.</p>
+    </div>
+
+    <div class="card">
+      <h2>Payroll Calculation <span class="hint" id="taxYearHint"></span></h2>
+      <div class="breakdown" id="taxBreakdown"></div>
+      <div class="paycheck-band" id="paycheckBand"></div>
+      <div class="disclaimer" id="taxDisclaimer">⚠️ Tax figures are <b>estimates</b> based on published rates for a single filer taking the standard deduction / basic personal amounts, and exclude local/city taxes, benefits, pension contributions and credits. Use them for budget planning only — not tax advice.</div>
+    </div>
+
+    <div class="card">
+      <h2>Tracking Period</h2>
+      <div class="grid cols-3">
+        <div><label>Period type</label><select id="inPeriodMode" onchange="onPeriodChange()">
+          <option value="calendar">Calendar year (Jan–Dec)</option>
+          <option value="custom">Custom range</option></select></div>
+        <div id="calYearWrap"><label>Year</label><select id="inCalYear" onchange="onPeriodChange()"></select></div>
+        <div id="startMonthWrap"><label>Start month</label><select id="inStartMonthSel" onchange="onPeriodChange()"></select></div>
+        <div id="startYearWrap"><label>Start year</label><select id="inStartYearSel" onchange="onPeriodChange()"></select></div>
+        <div id="numMonthsWrap"><label>Number of months</label><input type="number" id="inNumMonths" min="1" max="36" onchange="onPeriodChange()"></div>
+        <div><label>Budget name</label><input type="text" id="inName" onchange="onIncomeChange()"></div>
+      </div>
+      <p class="muted" id="periodHint" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card">
+      <h2>Danger Zone</h2>
+      <button class="btn danger small" onclick="resetAll()">Reset all data</button>
+      <p class="muted" style="margin-top:8px">Deletes everything stored in this browser, including your password.</p>
+    </div>
+  </section>
+
+  <!-- ---------- BUDGET ---------- -->
+  <section id="tab-budget" style="display:none">
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:14px">
+        <h2 style="margin-bottom:0">Monthly Budget by Expense Item</h2>
+        <div style="display:flex; gap:8px; align-items:center">
+          <label style="margin:0" for="budgetCurrency">Currency</label>
+          <select id="budgetCurrency" style="width:auto" onchange="onBudgetCurrency(this.value)"></select>
+          <button class="btn small" onclick="addExpense()">＋ Add item</button>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table id="budgetTable"></table></div>
+      <p class="muted" style="margin-top:10px">Classification: <span class="tag mand">Mandatory</span> = fixed obligations &nbsp; <span class="tag disc">Discretionary</span> = flexible spending</p>
+    </div>
+  </section>
+
+  <!-- ---------- TRACKING ---------- -->
+  <section id="tab-tracking" style="display:none">
+    <div class="card">
+      <h2>Actual Spend by Month <span class="hint">type in what you actually spent — saves automatically</span></h2>
+      <div class="tbl-wrap" style="max-height:70vh; overflow:auto"><table id="trackTable"></table></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   TAX DATA — estimates, single filer, 2025/26 rules. Amounts in local
+   currency of the country. Brackets are [threshold, marginalRate] on
+   TAXABLE income unless noted.
+===================================================================== */
+const TAX_YEAR_LABEL = '2025/26 rates';
+
+const US_FED = {
+  stdDed: 15750,
+  brackets: [[0,.10],[11925,.12],[48475,.22],[103350,.24],[197300,.32],[250525,.35],[626350,.37]],
+  ssRate:.062, ssCap:176100, medRate:.0145, medAddRate:.009, medAddOver:200000
+};
+// US states: d = deduction/exemption, b = brackets (empty = no income tax)
+const US_STATES = {
+  AL:{n:'Alabama',d:3000,b:[[0,.02],[500,.04],[3000,.05]]},
+  AK:{n:'Alaska',d:0,b:[]},
+  AZ:{n:'Arizona',d:15750,b:[[0,.025]]},
+  AR:{n:'Arkansas',d:2340,b:[[0,.02],[4500,.039]]},
+  CA:{n:'California',d:5540,b:[[0,.01],[10756,.02],[25499,.04],[40245,.06],[55866,.08],[70606,.093],[360659,.103],[432787,.113],[721314,.123]]},
+  CO:{n:'Colorado',d:15750,b:[[0,.044]]},
+  CT:{n:'Connecticut',d:0,b:[[0,.02],[10000,.045],[50000,.055],[100000,.06],[200000,.065],[250000,.069],[500000,.0699]]},
+  DE:{n:'Delaware',d:3250,b:[[0,0],[2000,.022],[5000,.039],[10000,.048],[20000,.052],[25000,.0555],[60000,.066]]},
+  DC:{n:'District of Columbia',d:15750,b:[[0,.04],[10000,.06],[40000,.065],[60000,.085],[250000,.0925],[500000,.0975],[1000000,.1075]]},
+  FL:{n:'Florida',d:0,b:[]},
+  GA:{n:'Georgia',d:12000,b:[[0,.0519]]},
+  HI:{n:'Hawaii',d:4400,b:[[0,.014],[9600,.055],[14400,.064],[19200,.068],[24000,.072],[36000,.076],[48000,.079],[125000,.0825],[175000,.09],[225000,.10],[275000,.11]]},
+  ID:{n:'Idaho',d:15750,b:[[0,.05695]]},
+  IL:{n:'Illinois',d:2775,b:[[0,.0495]]},
+  IN:{n:'Indiana',d:1000,b:[[0,.03]]},
+  IA:{n:'Iowa',d:15750,b:[[0,.038]]},
+  KS:{n:'Kansas',d:3605,b:[[0,.052],[23000,.0558]]},
+  KY:{n:'Kentucky',d:3270,b:[[0,.04]]},
+  LA:{n:'Louisiana',d:12500,b:[[0,.03]]},
+  ME:{n:'Maine',d:15750,b:[[0,.058],[26800,.0675],[63450,.0715]]},
+  MD:{n:'Maryland',d:2700,b:[[0,.02],[1000,.03],[2000,.04],[3000,.0475],[100000,.05],[125000,.0525],[150000,.055],[250000,.0575]]},
+  MA:{n:'Massachusetts',d:4400,b:[[0,.05],[1083150,.09]]},
+  MI:{n:'Michigan',d:5800,b:[[0,.0425]]},
+  MN:{n:'Minnesota',d:14950,b:[[0,.0535],[31690,.068],[104090,.0785],[193240,.0985]]},
+  MS:{n:'Mississippi',d:8300,b:[[0,0],[10000,.044]]},
+  MO:{n:'Missouri',d:15750,b:[[0,0],[1313,.02],[2626,.025],[3939,.03],[5252,.035],[6565,.04],[7878,.045],[9191,.047]]},
+  MT:{n:'Montana',d:15750,b:[[0,.047],[21100,.059]]},
+  NE:{n:'Nebraska',d:8600,b:[[0,.0246],[4030,.0351],[24120,.0501],[38870,.052]]},
+  NV:{n:'Nevada',d:0,b:[]},
+  NH:{n:'New Hampshire',d:0,b:[]},
+  NJ:{n:'New Jersey',d:1000,b:[[0,.014],[20000,.0175],[35000,.035],[40000,.05525],[75000,.0637],[500000,.0897],[1000000,.1075]]},
+  NM:{n:'New Mexico',d:15750,b:[[0,.015],[5500,.032],[16500,.043],[33500,.047],[66500,.049],[210000,.059]]},
+  NY:{n:'New York',d:8000,b:[[0,.04],[8500,.045],[11700,.0525],[13900,.055],[80650,.06],[215400,.0685],[1077550,.0965]]},
+  NC:{n:'North Carolina',d:12750,b:[[0,.0425]]},
+  ND:{n:'North Dakota',d:15750,b:[[0,0],[48475,.0195],[244825,.025]]},
+  OH:{n:'Ohio',d:0,b:[[0,0],[26050,.0275]]},
+  OK:{n:'Oklahoma',d:6350,b:[[0,.0025],[1000,.0075],[2500,.0175],[3750,.0275],[4900,.0375],[7200,.0475]]},
+  OR:{n:'Oregon',d:2745,b:[[0,.0475],[4400,.0675],[11050,.0875],[125000,.099]]},
+  PA:{n:'Pennsylvania',d:0,b:[[0,.0307]]},
+  RI:{n:'Rhode Island',d:10550,b:[[0,.0375],[79900,.0475],[181650,.0599]]},
+  SC:{n:'South Carolina',d:15750,b:[[0,0],[3560,.03],[17830,.062]]},
+  SD:{n:'South Dakota',d:0,b:[]},
+  TN:{n:'Tennessee',d:0,b:[]},
+  TX:{n:'Texas',d:0,b:[]},
+  UT:{n:'Utah',d:876,b:[[0,.0455]]},
+  VT:{n:'Vermont',d:7400,b:[[0,.0335],[47900,.066],[116000,.076],[242000,.0875]]},
+  VA:{n:'Virginia',d:8500,b:[[0,.02],[3000,.03],[5000,.05],[17000,.0575]]},
+  WA:{n:'Washington',d:0,b:[]},
+  WV:{n:'West Virginia',d:0,b:[[0,.0222],[10000,.0296],[25000,.0333],[40000,.0444],[60000,.0482]]},
+  WI:{n:'Wisconsin',d:13230,b:[[0,.035],[14320,.044],[28640,.053],[315310,.0765]]},
+  WY:{n:'Wyoming',d:0,b:[]}
+};
+
+const CA_FED = {
+  bpa: 16129, lowRate:.145,
+  brackets: [[0,.145],[57375,.205],[114750,.26],[177882,.29],[253414,.33]],
+  cppRate:.0595, cppExempt:3500, cppCap:71300, cpp2Rate:.04, cpp2Cap:81200,
+  eiRate:.0164, eiCap:65700
+};
+// Canadian provinces: bpa = basic personal amount, b = brackets on taxable income
+const CA_PROV = {
+  AB:{n:'Alberta',bpa:22323,b:[[0,.10],[151234,.12],[181481,.13],[241974,.14],[362961,.15]]},
+  BC:{n:'British Columbia',bpa:12932,b:[[0,.0506],[49279,.077],[98560,.105],[113158,.1229],[137407,.147],[186306,.168],[259829,.205]]},
+  MB:{n:'Manitoba',bpa:15780,b:[[0,.108],[47564,.1275],[101200,.174]]},
+  NB:{n:'New Brunswick',bpa:13396,b:[[0,.094],[51306,.14],[102614,.16],[190060,.195]]},
+  NL:{n:'Newfoundland & Labrador',bpa:11067,b:[[0,.087],[44192,.145],[88382,.158],[157792,.178],[220910,.198],[282214,.208]]},
+  NS:{n:'Nova Scotia',bpa:11744,b:[[0,.0879],[30507,.1495],[61015,.1667],[95883,.175],[154650,.21]]},
+  NT:{n:'Northwest Territories',bpa:17842,b:[[0,.059],[51964,.086],[103930,.122],[168967,.1405]]},
+  NU:{n:'Nunavut',bpa:19274,b:[[0,.04],[54707,.07],[109413,.09],[177881,.115]]},
+  ON:{n:'Ontario',bpa:12747,b:[[0,.0505],[52886,.0915],[105775,.1116],[150000,.1216],[220000,.1316]]},
+  PE:{n:'Prince Edward Island',bpa:14250,b:[[0,.095],[33328,.1347],[64656,.166],[105000,.1762],[140000,.19]]},
+  QC:{n:'Quebec',bpa:18571,b:[[0,.14],[53255,.19],[106495,.24],[129590,.2575]]},
+  SK:{n:'Saskatchewan',bpa:18991,b:[[0,.105],[53463,.125],[152750,.145]]},
+  YT:{n:'Yukon',bpa:16129,b:[[0,.064],[57375,.09],[114750,.109],[177882,.128],[500000,.15]]}
+};
+
+const UK = {
+  personalAllowance:12570, paTaperStart:100000,
+  regions:{
+    RUK:{n:'England / Wales / N. Ireland', b:[[0,.20],[37700,.40],[125140,.45]]},
+    SCT:{n:'Scotland', b:[[0,.19],[2827,.20],[14921,.21],[31092,.42],[62430,.45],[125140,.48]]}
+  },
+  niLower:12570, niUpper:50270, niMainRate:.08, niUpperRate:.02
+};
+
+const CURRENCIES = ['GBP','USD','CAD','EUR','AUD','JPY','KRW','CNY','INR','CHF','MXN','SGD','HKD','NZD'];
+
+/* ---------- Tax engine ---------- */
+function bracketTax(taxable, brackets){
+  let tax = 0;
+  for(let i=0;i<brackets.length;i++){
+    const [min,rate] = brackets[i];
+    if(taxable <= min) break;
+    const next = i+1 < brackets.length ? brackets[i+1][0] : Infinity;
+    tax += (Math.min(taxable,next) - min) * rate;
+  }
+  return tax;
+}
+
+function calcPayroll(s){
+  if(s.incomeMode==='payslip'){
+    const f = +s.payFreq || 12;
+    const g = Math.max(0, +s.psGross || 0) * f;
+    const tax = Math.max(0, +s.psTax || 0) * f;
+    const oth = Math.max(0, +s.psOther || 0) * f;
+    const netIn = Math.max(0, +s.psNet || 0) * f;
+    const out = {gross:g, lines:[], net: netIn > 0 ? netIn : Math.max(0, g - tax - oth)};
+    if(tax > 0.005) out.lines.push(['Income tax withheld', tax]);
+    if(oth > 0.005) out.lines.push(['Other deductions', oth]);
+    const unlabeled = (g - out.net) - tax - oth; // net from slip doesn't match gross − itemized
+    if(unlabeled > 0.005) out.lines.push(['Other withholdings (per pay slip)', unlabeled]);
+    out.totalTax = g - out.net;
+    out.effRate = g > 0 ? out.totalTax / g : 0;
+    return out;
+  }
+  const g = Math.max(0, +s.annualSalary || 0);
+  const out = {gross:g, lines:[], net:g};
+  const add = (label, amt)=>{ if(amt>0.005){ out.lines.push([label, amt]); out.net -= amt; } };
+
+  if(s.country==='US'){
+    const st = US_STATES[s.region] || US_STATES.TX;
+    add('Federal income tax', bracketTax(Math.max(0,g-US_FED.stdDed), US_FED.brackets));
+    add(st.n+' state income tax', st.b.length ? bracketTax(Math.max(0,g-st.d), st.b) : 0);
+    add('Social Security (6.2%)', US_FED.ssRate*Math.min(g,US_FED.ssCap));
+    add('Medicare', US_FED.medRate*g + US_FED.medAddRate*Math.max(0,g-US_FED.medAddOver));
+  } else if(s.country==='CA'){
+    const pv = CA_PROV[s.region] || CA_PROV.ON;
+    let fed = Math.max(0, bracketTax(g, CA_FED.brackets) - CA_FED.bpa*CA_FED.lowRate);
+    if(s.region==='QC') fed *= 0.835; // federal abatement for Quebec
+    add('Federal income tax', fed);
+    add(pv.n+' provincial tax', Math.max(0, bracketTax(g, pv.b) - pv.bpa*pv.b[0][1]));
+    const cpp = CA_FED.cppRate*Math.max(0,Math.min(g,CA_FED.cppCap)-CA_FED.cppExempt)
+              + CA_FED.cpp2Rate*Math.max(0,Math.min(g,CA_FED.cpp2Cap)-CA_FED.cppCap);
+    add('CPP contributions', cpp);
+    add('EI premiums', CA_FED.eiRate*Math.min(g,CA_FED.eiCap));
+  } else if(s.country==='UK'){
+    const rg = UK.regions[s.region] || UK.regions.RUK;
+    const pa = Math.max(0, UK.personalAllowance - Math.max(0,g-UK.paTaperStart)/2);
+    add('Income tax ('+(s.region==='SCT'?'Scottish':'UK')+' rates)', bracketTax(Math.max(0,g-pa), rg.b));
+    const ni = UK.niMainRate*Math.max(0,Math.min(g,UK.niUpper)-UK.niLower)
+             + UK.niUpperRate*Math.max(0,g-UK.niUpper);
+    add('National Insurance', ni);
+  } else { // manual effective rate
+    add('Income taxes ('+(+s.manualRate||0)+'% effective)', g*(+s.manualRate||0)/100);
+  }
+  out.totalTax = out.gross - out.net;
+  out.effRate = g>0 ? out.totalTax/g : 0;
+  return out;
+}
+
+/* =====================================================================
+   STATE, CRYPTO & PERSISTENCE
+===================================================================== */
+const STORE_KEY = 'budget_encrypted_v1';
+let state = null;   // decrypted app data
+let vault = null;   // {key, salt} — always set together so they can never mismatch
+let charts = {};
+
+function defaultState(){
+  const mk=(name,cls,budget)=>({id:crypto.randomUUID(), name, cls, budget});
+  return {
+    name: "Siyi's Monthly Budget",
+    settings:{ annualSalary:64500, currency:'GBP', country:'UK', region:'RUK',
+               payFreq:12, otherIncome:200, manualRate:25,
+               periodMode:'calendar', calendarYear:2026,
+               startMonth:'2026-09', numMonths:13 },
+    expenses:[
+      mk('Rent','M',1900), mk('Water, Gas, Electricity, etc.','M',300),
+      mk('Council Taxes','M',200), mk('Internet','M',50), mk('Mobile Plan','M',25),
+      mk("Renter's Insurance",'M',100), mk('Underground Tube','M',200),
+      mk('Groceries','M',600), mk('Delivery App Meals','D',200),
+      mk('Restaurants / Going Out','D',300), mk('Entertainment / Shopping','D',200)
+    ],
+    actuals:{} // { 'YYYY-MM': { expenseId: amount } }
+  };
+}
+
+const b64 = a => btoa(String.fromCharCode(...new Uint8Array(a)));
+const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+
+async function deriveKey(password, salt){
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:210000, hash:'SHA-256'},
+    km, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function saveState(){
+  const v = vault; // snapshot so a concurrent re-key can't split the pair
+  if(!state || !v) return;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, v.key,
+    new TextEncoder().encode(JSON.stringify(state)));
+  localStorage.setItem(STORE_KEY, JSON.stringify({v:1, salt:b64(v.salt), iv:b64(iv), data:b64(ct)}));
+}
+async function tryUnlock(password){
+  const blob = JSON.parse(localStorage.getItem(STORE_KEY));
+  const salt = unb64(blob.salt);
+  const key = await deriveKey(password, salt);
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(blob.iv)}, key, unb64(blob.data)); // throws on wrong pw
+  vault = {key, salt};
+  state = JSON.parse(new TextDecoder().decode(pt));
+}
+async function createVault(password){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(password, salt);
+  vault = {key, salt};
+  state = defaultState();
+  await saveState();
+}
+
+/* ---------- Lock screen wiring ---------- */
+const $ = id => document.getElementById(id);
+function initLock(){
+  const isNew = !localStorage.getItem(STORE_KEY);
+  $('lockTitle').textContent = isNew ? 'Welcome — set a password' : 'Monthly Budget';
+  $('lockMsg').textContent = isNew
+    ? 'Choose a password to protect your budget. All data is encrypted with it in this browser — if you forget it, the data cannot be recovered.'
+    : 'Enter your password to unlock your budget.';
+  $('pwConfirmField').style.display = isNew ? '' : 'none';
+  $('unlockBtn').textContent = isNew ? 'Create budget' : 'Unlock';
+  if(!isNew){
+    $('resetHint').innerHTML = 'Forgot your password? <a href="#" onclick="resetAll();return false;" style="color:var(--red)">Reset all data</a>';
+  }
+  $('pwInput').focus();
+}
+let unlocking = false;
+async function handleUnlock(){
+  if(unlocking) return; // key derivation is slow — block double submits
+  const pw = $('pwInput').value;
+  const isNew = !localStorage.getItem(STORE_KEY);
+  const err = m => { $('lockErr').textContent=m; $('lockErr').style.display='block'; };
+  $('lockErr').style.display='none';
+  if(pw.length < 6) return err('Password must be at least 6 characters.');
+  unlocking = true; $('unlockBtn').disabled = true;
+  try{
+    if(isNew){
+      if(pw !== $('pwConfirm').value) return err('Passwords do not match.');
+      await createVault(pw);
+    } else {
+      await tryUnlock(pw);
+    }
+    $('pwInput').value = ''; $('pwConfirm').value = '';
+    $('lockScreen').style.display='none'; $('app').style.display='block';
+    renderAll();
+  }catch(e){ err('Incorrect password.'); }
+  finally{ unlocking = false; $('unlockBtn').disabled = false; }
+}
+$('unlockBtn').addEventListener('click', handleUnlock);
+$('pwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') handleUnlock(); });
+$('pwConfirm').addEventListener('keydown', e=>{ if(e.key==='Enter') handleUnlock(); });
+
+function lockApp(){
+  vault=null; state=null;
+  $('app').style.display='none'; $('lockScreen').style.display='flex';
+  initLock();
+}
+async function openChangePw(){
+  const cur = prompt('Current password:'); if(cur===null) return;
+  try{ await tryUnlock(cur); }catch(e){ return alert('Incorrect current password.'); }
+  const nw = prompt('New password (min 6 characters):'); if(nw===null) return;
+  if(nw.length<6) return alert('Too short.');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(nw, salt);
+  vault = {key, salt};
+  await saveState();
+  toast('Password changed');
+}
+function resetAll(){
+  if(!confirm('Delete ALL budget data and the password from this browser? This cannot be undone.')) return;
+  localStorage.removeItem(STORE_KEY);
+  location.reload();
+}
+
+/* ---------- Export / import ---------- */
+function exportData(){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
+  a.download = (state.name||'budget').replace(/[^\w]+/g,'-').toLowerCase()+'-export.json';
+  a.click();
+  toast('Exported — note: the file is unencrypted, keep it private');
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = async ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(!d.settings || !d.expenses) throw 0;
+      state = d; await saveState(); renderAll(); toast('Imported');
+    }catch(e){ alert('Not a valid budget export file.'); }
+  };
+  r.readAsText(f); ev.target.value='';
+}
+
+/* =====================================================================
+   HELPERS
+===================================================================== */
+function fmt(n, dec=0){
+  return new Intl.NumberFormat(undefined,{style:'currency',currency:state.settings.currency,
+    minimumFractionDigits:dec, maximumFractionDigits:dec}).format(n||0);
+}
+function months(){
+  const s = state.settings;
+  let y, m, n;
+  if((s.periodMode||'custom')==='calendar'){
+    y = +s.calendarYear || new Date().getFullYear(); m = 1; n = 12; // Jan–Dec, always 12
+  } else {
+    [y,m] = s.startMonth.split('-').map(Number); n = s.numMonths;
+  }
+  const out=[];
+  for(let i=0;i<n;i++){
+    const d = new Date(y, m-1+i, 1);
+    out.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+              label:d.toLocaleDateString(undefined,{month:'short',year:'2-digit'})});
+  }
+  return out;
+}
+function actual(mKey, expId){ return (state.actuals[mKey]||{})[expId]; }
+function setActual(mKey, expId, val){
+  if(!state.actuals[mKey]) state.actuals[mKey]={};
+  if(val===''||val===null) delete state.actuals[mKey][expId];
+  else state.actuals[mKey][expId] = +val;
+}
+function monthTotal(mKey){
+  return state.expenses.reduce((s,e)=> s + (+actual(mKey,e.id)||0), 0);
+}
+function monthHasData(mKey){
+  const a = state.actuals[mKey];
+  return a && Object.values(a).some(v=>v!==undefined && v!==null);
+}
+function totalBudget(){ return state.expenses.reduce((s,e)=>s+(+e.budget||0),0); }
+// Month-by-month cash position: tracked months use actual spend, untracked
+// months are forecast at the budgeted total; the closing balance rolls into
+// the next month's opening balance.
+function cashFlow(ms, inc, tb){
+  let bal = 0;
+  return ms.map(m=>{
+    const has = monthHasData(m.key);
+    const spend = has ? monthTotal(m.key) : tb;
+    const delta = inc - spend;
+    const open = bal; bal += delta;
+    return {key:m.key, label:m.label, has, spend, delta, open, close:bal};
+  });
+}
+function netMonthlyIncome(){ return calcPayroll(state.settings).net/12 + (+state.settings.otherIncome||0); }
+
+let toastTimer;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+const debouncedSave = (()=>{ let t; return ()=>{ clearTimeout(t); t=setTimeout(saveState,400); }; })();
+
+/* =====================================================================
+   RENDERING
+===================================================================== */
+function switchTab(name){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  ['dashboard','income','budget','tracking'].forEach(t=>$('tab-'+t).style.display = t===name?'':'none');
+  if(name==='dashboard') renderDashboard();
+}
+
+function renderAll(){
+  $('appTitle').textContent = state.name || 'Monthly Budget';
+  renderIncomeForm(); renderBudget(); renderTracking(); renderDashboard();
+}
+
+/* ---------- Income tab ---------- */
+function renderIncomeForm(){
+  const s = state.settings;
+  $('inCurrency').innerHTML = CURRENCIES.map(c=>`<option ${c===s.currency?'selected':''}>${c}</option>`).join('');
+  $('inCountry').innerHTML = [
+    ['US','United States'],['CA','Canada'],['UK','United Kingdom'],['OTHER','Other (manual rate)']
+  ].map(([v,n])=>`<option value="${v}" ${v===s.country?'selected':''}>${n}</option>`).join('');
+  $('inSalary').value = s.annualSalary;
+  $('inFreq').value = s.payFreq;
+  $('inOtherIncome').value = s.otherIncome;
+  $('inManualRate').value = s.manualRate;
+  $('inIncomeMode').value = s.incomeMode || 'estimate';
+  $('inPsGross').value = s.psGross || '';
+  $('inPsNet').value = s.psNet || '';
+  $('inPsTax').value = s.psTax || '';
+  $('inPsOther').value = s.psOther || '';
+  if(!s.periodMode){ // data saved before the calendar-year option existed
+    s.periodMode = 'calendar';
+    s.calendarYear = +(s.startMonth||'').split('-')[0] || new Date().getFullYear();
+  }
+  $('inPeriodMode').value = s.periodMode;
+  const [startY, startM] = s.startMonth.split('-').map(Number);
+  fillYearSelect($('inCalYear'), s.calendarYear || new Date().getFullYear());
+  fillYearSelect($('inStartYearSel'), startY);
+  $('inStartMonthSel').innerHTML = Array.from({length:12},(_,i)=>{
+    const name = new Date(2000, i, 1).toLocaleDateString(undefined,{month:'long'});
+    return `<option value="${i+1}" ${i+1===startM?'selected':''}>${name}</option>`;
+  }).join('');
+  $('inNumMonths').value = s.numMonths;
+  $('inName').value = state.name||'';
+  updatePeriodFields();
+  fillRegions();
+  updateIncomeModeFields();
+  renderTaxBreakdown();
+}
+function updateIncomeModeFields(){
+  const ps = state.settings.incomeMode==='payslip';
+  document.querySelectorAll('.ps-field').forEach(el=>el.style.display = ps?'':'none');
+  $('salaryWrap').style.display = ps?'none':'';
+  $('countryWrap').style.display = ps?'none':'';
+  if(ps){ $('regionWrap').style.display='none'; $('manualRateWrap').style.display='none'; }
+  else fillRegions(); // restores region/manual-rate visibility for the selected country
+}
+function fillYearSelect(sel, selected){
+  const now = new Date().getFullYear();
+  const from = Math.min(now-6, selected), to = Math.max(now+10, selected);
+  let h = '';
+  for(let y=from; y<=to; y++) h += `<option value="${y}" ${y===selected?'selected':''}>${y}</option>`;
+  sel.innerHTML = h;
+}
+function updatePeriodFields(){
+  const cal = state.settings.periodMode==='calendar';
+  $('calYearWrap').style.display = cal?'':'none';
+  $('startMonthWrap').style.display = cal?'none':'';
+  $('startYearWrap').style.display = cal?'none':'';
+  $('numMonthsWrap').style.display = cal?'none':'';
+  const ms = months();
+  $('periodHint').textContent = `Tracking ${ms[0].label} – ${ms[ms.length-1].label} (${ms.length} months). ` +
+    'Amounts you entered for months outside this period are kept and reappear if you change the period back.';
+}
+function fillRegions(){
+  const s = state.settings;
+  const wrap = $('regionWrap'), manual = $('manualRateWrap');
+  let opts = null, lbl = 'State / Province';
+  if(s.country==='US'){ lbl='State'; opts = Object.entries(US_STATES).map(([k,v])=>[k,v.n]); }
+  else if(s.country==='CA'){ lbl='Province / Territory'; opts = Object.entries(CA_PROV).map(([k,v])=>[k,v.n]); }
+  else if(s.country==='UK'){ lbl='Tax region'; opts = Object.entries(UK.regions).map(([k,v])=>[k,v.n]); }
+  wrap.style.display = opts?'':'none';
+  manual.style.display = s.country==='OTHER'?'':'none';
+  if(opts){
+    $('regionLbl').textContent = lbl;
+    opts.sort((a,b)=>a[1].localeCompare(b[1]));
+    $('inRegion').innerHTML = opts.map(([v,n])=>`<option value="${v}" ${v===s.region?'selected':''}>${n}</option>`).join('');
+    if(!opts.some(([v])=>v===s.region)){ s.region = opts[0][0]; $('inRegion').value = s.region; }
+  }
+}
+function onCountryChange(){
+  state.settings.country = $('inCountry').value;
+  const defaults = {US:'CA', CA:'ON', UK:'RUK'};
+  state.settings.region = defaults[state.settings.country] || '';
+  fillRegions();
+  onIncomeChange();
+}
+function onIncomeChange(){
+  const s = state.settings;
+  s.annualSalary = +$('inSalary').value||0;
+  s.currency = $('inCurrency').value;
+  s.payFreq = +$('inFreq').value;
+  if($('regionWrap').style.display!=='none') s.region = $('inRegion').value;
+  s.manualRate = +$('inManualRate').value||0;
+  s.psGross = +$('inPsGross').value||0;
+  s.psNet = +$('inPsNet').value||0;
+  s.psTax = +$('inPsTax').value||0;
+  s.psOther = +$('inPsOther').value||0;
+  s.otherIncome = +$('inOtherIncome').value||0;
+  state.name = $('inName').value || state.name;
+  $('appTitle').textContent = state.name;
+  renderTaxBreakdown(); renderBudget(); renderDashboard(); debouncedSave();
+}
+function onIncomeModeChange(){
+  state.settings.incomeMode = $('inIncomeMode').value;
+  updateIncomeModeFields();
+  onIncomeChange();
+}
+function onPeriodChange(){
+  const s = state.settings;
+  s.periodMode = $('inPeriodMode').value;
+  s.calendarYear = +$('inCalYear').value || new Date().getFullYear();
+  s.startMonth = $('inStartYearSel').value + '-' + String($('inStartMonthSel').value).padStart(2,'0');
+  s.numMonths = Math.min(36, Math.max(1, +$('inNumMonths').value||12));
+  updatePeriodFields();
+  renderTracking(); renderDashboard(); debouncedSave();
+}
+function renderTaxBreakdown(){
+  const p = calcPayroll(state.settings);
+  const ps = state.settings.incomeMode==='payslip';
+  $('taxYearHint').textContent = ps ? 'from your pay slip (annualized)' : TAX_YEAR_LABEL + ' · estimates';
+  $('taxDisclaimer').innerHTML = ps
+    ? 'ℹ️ Figures are your pay-slip amounts multiplied out to a full year. Update them whenever your pay changes.'
+    : '⚠️ Tax figures are <b>estimates</b> based on published rates for a single filer taking the standard deduction / basic personal amounts, and exclude local/city taxes, benefits, pension contributions and credits. Use them for budget planning only — not tax advice.';
+  let h = `<div class="b-lbl">Gross annual salary</div><div class="b-val">${fmt(p.gross)}</div>`;
+  p.lines.forEach(([l,a])=>{ h += `<div class="b-lbl">− ${l}</div><div class="b-val neg">−${fmt(a)}</div>`; });
+  h += `<div class="b-lbl b-sub">Total taxes & deductions (${(p.effRate*100).toFixed(1)}% effective)</div><div class="b-val b-sub neg">−${fmt(p.totalTax)}</div>`;
+  h += `<div class="b-lbl b-net">Net annual pay</div><div class="b-val b-net pos">${fmt(p.net)}</div>`;
+  $('taxBreakdown').innerHTML = h;
+  const freq = +state.settings.payFreq||12;
+  const freqName = {52:'per week',26:'per pay (bi-weekly)',24:'per pay (semi-monthly)',12:'per month',1:'per year'}[freq];
+  $('paycheckBand').innerHTML = `
+    <div class="pc-chip"><span>Gross ${freqName}</span>${fmt(p.gross/freq)}</div>
+    <div class="pc-chip"><span>Net ${freqName}</span>${fmt(p.net/freq)}</div>
+    <div class="pc-chip"><span>Net monthly + other income</span>${fmt(netMonthlyIncome())}</div>`;
+}
+
+/* ---------- Budget tab ---------- */
+function renderBudget(){
+  $('budgetCurrency').innerHTML = CURRENCIES.map(c=>`<option ${c===state.settings.currency?'selected':''}>${c}</option>`).join('');
+  const rows = state.expenses.map((e,i)=>`
+    <tr>
+      <td><input type="text" value="${e.name.replace(/"/g,'&quot;')}" onchange="updExp('${e.id}','name',this.value)"></td>
+      <td style="text-align:left"><select style="width:auto" onchange="updExp('${e.id}','cls',this.value)">
+        <option value="M" ${e.cls==='M'?'selected':''}>Mandatory</option>
+        <option value="D" ${e.cls==='D'?'selected':''}>Discretionary</option></select></td>
+      <td><input type="number" min="0" step="10" value="${e.budget}" onchange="updExp('${e.id}','budget',this.value)"></td>
+      <td>${fmt((+e.budget||0)*12)}</td>
+      <td class="row-actions"><button title="Delete" onclick="delExp('${e.id}')">✕</button></td>
+    </tr>`).join('');
+  const inc = netMonthlyIncome(), tb = totalBudget();
+  $('budgetTable').innerHTML = `
+    <thead><tr><th>Expense item</th><th style="text-align:left">Classification</th><th>Monthly budget</th><th>Annualized</th><th></th></tr></thead>
+    <tbody>${rows}
+      <tr class="total-row"><td>Total budget</td><td></td><td>${fmt(tb)}</td><td>${fmt(tb*12)}</td><td></td></tr>
+      <tr class="total-row"><td>Net monthly income (incl. other)</td><td></td><td>${fmt(inc)}</td><td>${fmt(inc*12)}</td><td></td></tr>
+      <tr class="total-row"><td>Planned monthly savings</td><td></td>
+        <td class="${inc-tb>=0?'pos':'neg'}">${fmt(inc-tb)}</td><td class="${inc-tb>=0?'pos':'neg'}">${fmt((inc-tb)*12)}</td><td></td></tr>
+    </tbody>`;
+}
+function onBudgetCurrency(cur){
+  state.settings.currency = cur;
+  $('inCurrency').value = cur; // keep the Income & Taxes selector in sync
+  renderTaxBreakdown(); renderBudget(); renderTracking(); renderDashboard(); debouncedSave();
+  toast('Currency set to '+cur);
+}
+function updExp(id, field, val){
+  const e = state.expenses.find(x=>x.id===id); if(!e) return;
+  e[field] = field==='budget' ? (+val||0) : val;
+  renderBudget(); renderTracking(); renderDashboard(); debouncedSave();
+}
+function addExpense(){
+  state.expenses.push({id:crypto.randomUUID(), name:'New expense', cls:'D', budget:0});
+  renderBudget(); renderTracking(); debouncedSave();
+}
+function delExp(id){
+  const e = state.expenses.find(x=>x.id===id);
+  if(!confirm(`Delete "${e.name}" and all its tracked amounts?`)) return;
+  state.expenses = state.expenses.filter(x=>x.id!==id);
+  Object.values(state.actuals).forEach(m=>delete m[id]);
+  renderBudget(); renderTracking(); renderDashboard(); debouncedSave();
+}
+
+/* ---------- Tracking tab ---------- */
+function renderTracking(){
+  const ms = months();
+  const head = `<thead><tr><th>Expense item</th><th>Budget</th>${ms.map(m=>`<th>${m.label}</th>`).join('')}</tr></thead>`;
+  const body = state.expenses.map(e=>`
+    <tr><td>${e.name} <span class="tag ${e.cls==='M'?'mand':'disc'}">${e.cls==='M'?'M':'D'}</span></td>
+      <td style="font-weight:600">${fmt(e.budget)}</td>
+      ${ms.map(m=>{
+        const v = actual(m.key, e.id);
+        return `<td><input type="number" min="0" step="10" value="${v??''}" placeholder="—"
+          onchange="onActual('${m.key}','${e.id}',this.value)"></td>`;
+      }).join('')}
+    </tr>`).join('');
+  const tb = totalBudget(), inc = netMonthlyIncome();
+  const totRow = `<tr class="total-row"><td>Total actual spend</td><td>${fmt(tb)}</td>${
+    ms.map(m=>`<td>${monthHasData(m.key)?fmt(monthTotal(m.key)):'—'}</td>`).join('')}</tr>`;
+  const varRow = `<tr class="total-row"><td>Variance over / (under)</td><td></td>${
+    ms.map(m=>{
+      if(!monthHasData(m.key) || !tb) return '<td>—</td>';
+      const v = monthTotal(m.key)/tb - 1;
+      return `<td class="${v>0?'neg':'pos'}">${(v*100).toFixed(1)}%</td>`;
+    }).join('')}</tr>`;
+  const savRow = `<tr class="total-row"><td>Remaining cash for savings</td><td>${fmt(inc-tb)}</td>${
+    ms.map(m=>{
+      if(!monthHasData(m.key)) return '<td>—</td>';
+      const s = inc - monthTotal(m.key);
+      return `<td class="${s>=0?'pos':'neg'}">${fmt(s)}</td>`;
+    }).join('')}</tr>`;
+  $('trackTable').innerHTML = head + '<tbody>' + body + totRow + varRow + savRow + '</tbody>';
+}
+function onActual(mKey, expId, val){
+  setActual(mKey, expId, val);
+  renderTracking(); renderDashboard(); debouncedSave();
+}
+
+/* ---------- Dashboard ---------- */
+function renderDashboard(){
+  if($('tab-dashboard').style.display==='none') return;
+  const ms = months(), tb = totalBudget(), inc = netMonthlyIncome();
+  const withData = ms.filter(m=>monthHasData(m.key));
+  const avgSpend = withData.length ? withData.reduce((s,m)=>s+monthTotal(m.key),0)/withData.length : 0;
+  const avgSave = withData.length ? inc - avgSpend : inc - tb;
+  const endBal = cashFlow(ms, inc, tb).pop().close;
+  const p = calcPayroll(state.settings);
+
+  $('kpiRow').innerHTML = `
+    <div class="kpi"><div class="lbl">Net monthly income</div><div class="val">${fmt(inc)}</div>
+      <div class="delta neutral">gross ${fmt(p.gross/12)} / mo · ${(p.effRate*100).toFixed(1)}% eff. tax</div></div>
+    <div class="kpi"><div class="lbl">Total monthly budget</div><div class="val">${fmt(tb)}</div>
+      <div class="delta neutral">${tb&&inc?(tb/inc*100).toFixed(0):0}% of net income</div></div>
+    <div class="kpi"><div class="lbl">Avg actual spend</div><div class="val">${withData.length?fmt(avgSpend):'—'}</div>
+      <div class="delta ${avgSpend<=tb?'pos':'neg'}">${withData.length&&tb ? (avgSpend/tb-1>0?'+':'')+((avgSpend/tb-1)*100).toFixed(1)+'% vs budget' : 'no actuals yet'}</div></div>
+    <div class="kpi"><div class="lbl">Avg monthly savings</div><div class="val ${avgSave>=0?'pos':'neg'}">${fmt(avgSave)}</div>
+      <div class="delta neutral">${withData.length? withData.length+' month(s) tracked':'planned (no actuals yet)'}</div></div>
+    <div class="kpi"><div class="lbl">Projected end balance</div><div class="val ${endBal>=0?'pos':'neg'}">${fmt(endBal)}</div>
+      <div class="delta neutral">carried forward through ${ms[ms.length-1].label}</div></div>`;
+
+  // month selector for doughnut
+  const sel = $('doughnutMonth');
+  const prev = sel.value;
+  sel.innerHTML = ms.map(m=>`<option value="${m.key}">${m.label}</option>`).join('');
+  const defaultMonth = [...withData].pop() || ms[0];
+  sel.value = ms.some(m=>m.key===prev) && prev ? prev : defaultMonth.key;
+
+  renderBvaChart(ms, tb); renderDoughnut(); renderSavingsChart(ms, inc);
+  renderCarryTable(ms, inc, tb); renderSummaryTable(ms, tb, inc);
+}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function mkChart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); }
+
+function renderBvaChart(ms, tb){
+  if(typeof Chart==='undefined') return;
+  mkChart('chartBva', {type:'bar',
+    data:{labels:ms.map(m=>m.label), datasets:[
+      {label:'Budget', data:ms.map(()=>tb), type:'line', borderColor:css('--ink'), borderDash:[6,4], pointRadius:0, borderWidth:2},
+      {label:'Actual spend', data:ms.map(m=>monthHasData(m.key)?monthTotal(m.key):null),
+       backgroundColor:ms.map(m=>monthTotal(m.key)>tb?css('--red'):css('--accent')), borderRadius:6}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
+      scales:{y:{ticks:{callback:v=>fmt(v)}}}}});
+}
+function renderDoughnut(){
+  if(typeof Chart==='undefined' || !state) return;
+  const mKey = $('doughnutMonth').value;
+  const has = monthHasData(mKey);
+  const items = state.expenses.map(e=>({name:e.name, v: has ? (+actual(mKey,e.id)||0) : (+e.budget||0)})).filter(x=>x.v>0);
+  const palette = ['#3556e0','#0f9d58','#b7791f','#d93838','#7c3aed','#0891b2','#db2777','#65a30d','#dc7633','#5d6d7e','#16a085','#8e44ad'];
+  mkChart('chartCat', {type:'doughnut',
+    data:{labels:items.map(x=>x.name), datasets:[{data:items.map(x=>x.v), backgroundColor:items.map((_,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#fff'}]},
+    options:{responsive:true, maintainAspectRatio:false, cutout:'58%',
+      plugins:{legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+(has?'':' (budget)')}},
+        title:{display:!has, text:'Showing budget (no actuals for this month yet)', font:{size:11}, color:css('--muted')}}}});
+}
+function renderSavingsChart(ms, inc){
+  if(typeof Chart==='undefined') return;
+  const flow = cashFlow(ms, inc, totalBudget());
+  mkChart('chartSavings', {type:'bar',
+    data:{labels:ms.map(m=>m.label), datasets:[
+      {label:'Monthly surplus / (deficit)', data:flow.map(f=>f.delta),
+       backgroundColor:flow.map(f=>(f.delta<0?css('--red'):css('--green'))+(f.has?'':'55')), borderRadius:6},
+      {label:'Balance carried forward', data:flow.map(f=>f.close), type:'line',
+       borderColor:css('--accent'), backgroundColor:css('--accent'), tension:.3, pointRadius:3,
+       segment:{borderDash:c=>flow[c.p1DataIndex]&&!flow[c.p1DataIndex].has?[6,5]:undefined}}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)+(flow[c.dataIndex].has?'':' (forecast)')}}},
+      scales:{y:{ticks:{callback:v=>fmt(v)}}}}});
+}
+function renderCarryTable(ms, inc, tb){
+  const flow = cashFlow(ms, inc, tb);
+  const head = `<thead><tr><th>Month</th><th>Opening balance</th><th>Net income</th><th>Spend</th><th>Surplus / (deficit)</th><th>Closing balance</th></tr></thead>`;
+  const rows = flow.map(f=>`
+    <tr>
+      <td>${f.label}${f.has?'':' <span class="tag disc">forecast</span>'}</td>
+      <td class="${f.open<0?'neg':'neutral'}">${fmt(f.open)}</td>
+      <td>${fmt(inc)}</td>
+      <td>${fmt(f.spend)}</td>
+      <td class="${f.delta>=0?'pos':'neg'}">${f.delta<0?'('+fmt(-f.delta)+')':fmt(f.delta)}</td>
+      <td class="${f.close>=0?'pos':'neg'}" style="font-weight:700">${fmt(f.close)}</td>
+    </tr>`).join('');
+  const last = flow[flow.length-1];
+  const foot = `<tr class="total-row"><td>End of period</td><td></td><td>${fmt(inc*flow.length)}</td>
+    <td>${fmt(flow.reduce((s,f)=>s+f.spend,0))}</td>
+    <td class="${last.close>=0?'pos':'neg'}">${last.close<0?'('+fmt(-last.close)+')':fmt(last.close)}</td>
+    <td class="${last.close>=0?'pos':'neg'}">${fmt(last.close)}</td></tr>`;
+  $('carryTable').innerHTML = head + '<tbody>' + rows + foot + '</tbody>';
+}
+function renderSummaryTable(ms, tb, inc){
+  const head = `<thead><tr><th>Month</th><th>Net income</th><th>Budget</th><th>Actual spend</th><th>Variance</th><th>Savings</th></tr></thead>`;
+  const rows = ms.map(m=>{
+    const has = monthHasData(m.key);
+    if(!has) return `<tr><td>${m.label}</td><td>${fmt(inc)}</td><td>${fmt(tb)}</td><td class="neutral">—</td><td class="neutral">—</td><td class="neutral">—</td></tr>`;
+    const t = monthTotal(m.key), v = tb ? t/tb-1 : 0, s = inc - t;
+    return `<tr><td>${m.label}</td><td>${fmt(inc)}</td><td>${fmt(tb)}</td><td>${fmt(t)}</td>
+      <td class="${v>0?'neg':'pos'}">${(v*100).toFixed(1)}%</td>
+      <td class="${s>=0?'pos':'neg'}">${fmt(s)}</td></tr>`;
+  }).join('');
+  $('summaryTable').innerHTML = head + '<tbody>' + rows + '</tbody>';
+}
+
+/* ---------- boot ---------- */
+initLock();
+</script>
+</body>
+</html>
