@@ -1,5 +1,8 @@
 # Monthly Budget Tracker
 
+**Live site:** <https://skimilk-jpg.github.io/monthly-budget/> (deployed via GitHub
+Actions — every push to `main` republishes automatically)
+
 A single-file, password-protected budget web app ([index.html](index.html)). Tracks actual
 spend vs. monthly budget against gross/net payroll, with a built-in tax estimator for the
 US (federal + all 50 states + DC), Canada (federal + all provinces/territories), and the
@@ -34,15 +37,11 @@ python -m http.server 8741
 
 The app is one static file, so any static host works:
 
-1. **Netlify Drop** (easiest): go to <https://app.netlify.com/drop> and drag the folder
-   containing `index.html` onto the page. You get a public URL immediately.
-2. **GitLab Pages**: create a project on gitlab.com and push this folder (it already
-   contains the required `.gitlab-ci.yml`). The pipeline publishes the site to
-   `https://<username>.gitlab.io/<project>/`. To keep the repo private but the site
-   public: Settings → General → Visibility → set **Pages** to "Everyone".
-3. **GitHub Pages**: push this folder to a GitHub repo → Settings → Pages → deploy from
-   branch. The site will be at `https://<user>.github.io/<repo>/`.
-4. **Vercel**: `npx vercel` in this folder, or import the repo at vercel.com.
+Currently deployed on **GitHub Pages** from this repo — pushing to `main` triggers
+[.github/workflows/pages.yml](.github/workflows/pages.yml), which republishes the site.
+
+Other free static hosts work too (the app is one HTML file): Netlify Drop
+(<https://app.netlify.com/drop>, drag-and-drop), GitLab Pages, or Vercel.
 
 ## Important caveats
 
